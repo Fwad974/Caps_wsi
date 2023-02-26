@@ -1,4 +1,4 @@
-# Pytorch implementaion of CapsNet supporting multiMNIST
+# Pytorch implementaion of CapsNet for whole image segmentation
 This is an implementation of CapsNet from Dynamic Routing Between Capsules by Sabour and Hinton.
 This implementation can generate MultiMNIST data and the CapsNet implmentation is modified to support MultiMNIST.
 

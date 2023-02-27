@@ -97,61 +97,50 @@ class Decoder(nn.Module):
         self.multi = multi
 
     def forward(self, x, data):
+
         classes = torch.sqrt((x ** 2).sum(2))
-        classes = F.softmax(classes, dim=0)
-
-        if not self.multi:
-            _, max_length_indices = classes.max(dim=1)
-            max_length_indices = max_length_indices.squeeze()
-            masked = Variable(torch.sparse.torch.eye(10))
+        classes = F.sigmoid(classes) > 0.9
+        classes = classes.float()
+        rec_img = torch.zeros(x.size(0),784)
+        if USE_CUDA:
+            rec_img = rec_img.cuda()
+        for label in range(10):
+            masked_cap =torch.zeros((x.size(0),10))
+            masked_cap[:,label]=1
             if USE_CUDA:
-                masked = masked.cuda()
-            masked = masked.index_select(dim=0, index=Variable(max_length_indices.data))
-            t = (x * masked[:, :, None, None]).view(x.size(0), -1)
-            reconstructions = self.reconstruction_layers(t)
-        else:
-            _, max_length_indices = torch.topk(classes, 2, dim=1)
-            max_length_indices = max_length_indices.squeeze()
-            masked = Variable(torch.sparse.torch.eye(10))
-            if USE_CUDA:
-                masked = masked.cuda()
-            masked_cap0 = masked.index_select(dim=0, index=Variable(max_length_indices[:,0].data))
-            t0 = (x * masked_cap0[:, :, None, None]).view(x.size(0), -1)
-            masked_cap1 = masked.index_select(dim=0, index=Variable(max_length_indices[:,1].data))
-            t1 = (x * masked_cap1[:, :, None, None]).view(x.size(0), -1)
-            masked = torch.add(masked_cap0, masked_cap1)
-            reconstructions = torch.add(self.reconstruction_layers(t0), self.reconstruction_layers(t1))
-        reconstructions = reconstructions.view(-1, self.input_channel, self.input_width, self.input_height)
-        return reconstructions, masked
-
-    def forward_test(self, x, data):
-        classes = torch.sqrt((x ** 2).sum(2))
-        classes = F.softmax(classes, dim=0)
-
-        if not self.multi:
-            _, max_length_indices = classes.max(dim=1)
-            max_length_indices = max_length_indices.squeeze()
-            masked = Variable(torch.sparse.torch.eye(10))
-            if USE_CUDA:
-                masked = masked.cuda()
-            masked = masked.index_select(dim=0, index=Variable(max_length_indices.data))
-            t = (x * masked[:, :, None, None]).view(x.size(0), -1)
-            reconstructions = self.reconstruction_layers(t)
-        else:
-            _, max_length_indices = torch.topk(classes, 2, dim=1)
-            max_length_indices = max_length_indices.squeeze()
-            masked = Variable(torch.sparse.torch.eye(10))
-            if USE_CUDA:
-                masked = masked.cuda()
-            masked_cap0 = masked.index_select(dim=0, index=Variable(max_length_indices[:,0].data))
-            t0 = (x * masked_cap0[:, :, None, None]).view(x.size(0), -1)
-            masked_cap1 = masked.index_select(dim=0, index=Variable(max_length_indices[:,1].data))
-            t1 = (x * masked_cap1[:, :, None, None]).view(x.size(0), -1)
-            masked = torch.add(masked_cap0, masked_cap1)
-            reconstructions = [self.reconstruction_layers(t0).view(-1, self.input_channel, self.input_width, self.input_height), 
-                               self.reconstruction_layers(t1).view(-1, self.input_channel, self.input_width, self.input_height)]
-        #reconstructions = reconstructions.view(-1, self.input_channel, self.input_width, self.input_height)
-        return reconstructions, masked
+                 masked_cap = masked_cap.cuda()
+            t0 = (x * masked_cap[:, :, None, None]).view(x.size(0), -1)
+            rec = self.reconstruction_layers(t0)
+            rec = rec* classes[:,label]
+            rec_img = torch.add(rec, rec_img)
+        reconstructions = rec_img.view(-1, self.input_channel, self.input_width, self.input_height)
+        return reconstructions, classes
+        # classes = torch.sqrt((x ** 2).sum(2))
+        # classes = F.softmax(classes, dim=0)
+        #
+        # if not self.multi:
+        #     _, max_length_indices = classes.max(dim=1)
+        #     max_length_indices = max_length_indices.squeeze()
+        #     masked = Variable(torch.sparse.torch.eye(10))
+        #     if USE_CUDA:
+        #         masked = masked.cuda()
+        #     masked = masked.index_select(dim=0, index=Variable(max_length_indices.data))
+        #     t = (x * masked[:, :, None, None]).view(x.size(0), -1)
+        #     reconstructions = self.reconstruction_layers(t)
+        # else:
+        #     _, max_length_indices = torch.topk(classes, 2, dim=1)
+        #     max_length_indices = max_length_indices.squeeze()
+        #     masked = Variable(torch.sparse.torch.eye(10))
+        #     if USE_CUDA:
+        #         masked = masked.cuda()
+        #     masked_cap0 = masked.index_select(dim=0, index=Variable(max_length_indices[:,0].data))
+        #     t0 = (x * masked_cap0[:, :, None, None]).view(x.size(0), -1)
+        #     masked_cap1 = masked.index_select(dim=0, index=Variable(max_length_indices[:,1].data))
+        #     t1 = (x * masked_cap1[:, :, None, None]).view(x.size(0), -1)
+        #     masked = torch.add(masked_cap0, masked_cap1)
+        #     reconstructions = torch.add(self.reconstruction_layers(t0), self.reconstruction_layers(t1))
+        # reconstructions = reconstructions.view(-1, self.input_channel, self.input_width, self.input_height)
+        # return reconstructions, masked
 
 
 
@@ -176,11 +165,6 @@ class CapsNet(nn.Module):
     def forward(self, data):
         output, self.routing_in, self.routing_out = self.digit_capsules(self.primary_capsules(self.conv_layer(data)))
         reconstructions, masked = self.decoder(output, data)
-        return output, reconstructions, masked
-
-    def forward_test(self, data):
-        output, self.routing_in, self.routing_out = self.digit_capsules(self.primary_capsules(self.conv_layer(data)))
-        reconstructions, masked = self.decoder.forward_test(output, data)
         return output, reconstructions, masked
 
     def loss(self, data, x, target, reconstructions):

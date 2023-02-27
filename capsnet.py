@@ -4,6 +4,9 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
 
+
+
+
 USE_CUDA = True if torch.cuda.is_available() else False
 
 

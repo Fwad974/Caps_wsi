@@ -13,7 +13,7 @@ class ADP_Dataset(torch.utils.data.Dataset):
         'Initialization'
         df = pd.read_csv(path + "/ADP_EncodedLabels_Release1_Flat.csv")
 
-        self.labels = df[df.columns[1:10]].to_numpy()
+        self.labels = df[df.columns[1:11]].to_numpy()
 
         self.paths = np.array([os.path.join(path, "img_res_1um_bicubic", i) for i in df['Patch Names']])
         self.transform = transform

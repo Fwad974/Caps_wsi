@@ -9,7 +9,7 @@ import numpy as np
 from torchvision.io import read_image
 
 class ADP_Dataset(torch.utils.data.Dataset):
-    def __init__(self, path="/media/z/New Volume/ADP_Dataset", transform=None):
+    def __init__(self, path="./ADP_V1.0_Release", transform=None):
         'Initialization'
         df = pd.read_csv(path + "/ADP_EncodedLabels_Release1_Flat.csv")
 

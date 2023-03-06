@@ -102,7 +102,7 @@ class Decoder(nn.Module):
         classes1=classes
         classes = F.softmax(classes, dim=1) > 0.1
         classes = classes.float()
-        rec_img = torch.zeros(x.size(0),784)
+        rec_img = torch.zeros(x.size(0),self.input_height*self.input_width *3)
         if USE_CUDA:
             rec_img = rec_img.cuda()
         for label in range(10):
@@ -115,7 +115,7 @@ class Decoder(nn.Module):
             rec = rec* classes[:,label]
             rec_img = torch.add(rec, rec_img)
         reconstructions = rec_img.view(-1, self.input_channel, self.input_width, self.input_height)
-        return reconstructions, classes, classes1
+        return reconstructions, classes
         # classes = torch.sqrt((x ** 2).sum(2))
         # classes = F.softmax(classes, dim=0)
         #
@@ -165,8 +165,8 @@ class CapsNet(nn.Module):
 
     def forward(self, data):
         output, self.routing_in, self.routing_out = self.digit_capsules(self.primary_capsules(self.conv_layer(data)))
-        reconstructions, masked,classes1 = self.decoder(output, data)
-        return output, reconstructions, masked,classes1
+        reconstructions, masked = self.decoder(output, data)
+        return output, reconstructions, masked
 
     def loss(self, data, x, target, reconstructions):
         return self.margin_loss(x, target) + self.reconstruction_loss(data, reconstructions)

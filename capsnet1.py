@@ -176,8 +176,8 @@ class CapsNet(nn.Module):
 
         v_c = torch.sqrt((x ** 2).sum(dim=2, keepdim=True))
 
-        left = F.relu(0.99 - v_c).view(batch_size, -1)
-        right = F.relu(v_c - 0.01).view(batch_size, -1)
+        left = F.relu(0.9 - v_c).view(batch_size, -1)
+        right = F.relu(v_c - 0.1).view(batch_size, -1)
 
         loss = labels * left + 0.5 * (1.0 - labels) * right
         loss = loss.sum(dim=1).mean()

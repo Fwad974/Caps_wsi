@@ -101,7 +101,7 @@ class Decoder(nn.Module):
 
         classes = torch.sqrt((x ** 2).sum(2))
         classes1=classes
-        classes = F.softmax(classes, dim=1) > 1/self.caps_num
+        classes = F.softmax(classes, dim=1) > (1/self.caps_num)
         classes = classes.float()
         rec_img = torch.zeros(x.size(0),self.input_height*self.input_width *3)
         if USE_CUDA:
@@ -161,6 +161,7 @@ class CapsNet(nn.Module):
             self.primary_capsules = PrimaryCaps()
             self.digit_capsules = DigitCaps()
             self.decoder = Decoder()
+        self.label_smooth=1/config.dc_num_capsules
 
         self.mse_loss = nn.MSELoss()
 
@@ -177,8 +178,8 @@ class CapsNet(nn.Module):
 
         v_c = torch.sqrt((x ** 2).sum(dim=2, keepdim=True))
 
-        left = F.relu(0.9 - v_c).view(batch_size, -1)
-        right = F.relu(v_c - 0.1).view(batch_size, -1)
+        left = F.relu((1-self.label_smooth) - v_c).view(batch_size, -1)
+        right = F.relu(v_c - self.label_smooth).view(batch_size, -1)
 
         loss = labels * left + 0.5 * (1.0 - labels) * right
         loss = loss.sum(dim=1).mean()

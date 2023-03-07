@@ -81,32 +81,33 @@ class DigitCaps(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, input_width=28, input_height=28, input_channel=1, multi=False):
+    def __init__(self, input_width=28, input_height=28, input_channel=1, caps_num=10 , decoder_layes=(16,10,512,1024), multi=False):
         super(Decoder, self).__init__()
         self.input_width = input_width
         self.input_height = input_height
         self.input_channel = input_channel
         self.reconstruction_layers = nn.Sequential(
-            nn.Linear(16 * 10, 512),
+            nn.Linear(decoder_layes[0] * decoder_layes[1], decoder_layes[2]),
             nn.ReLU(inplace=True),
-            nn.Linear(512, 1024),
+            nn.Linear(decoder_layes[2], decoder_layes[3]),
             nn.ReLU(inplace=True),
-            nn.Linear(1024, self.input_height * self.input_height * self.input_channel),
+            nn.Linear(decoder_layes[3], self.input_height * self.input_height * self.input_channel),
             nn.Sigmoid()
         )
+        self.caps_num=caps_num
         self.multi = multi
 
     def forward(self, x, data):
 
         classes = torch.sqrt((x ** 2).sum(2))
         classes1=classes
-        classes = F.softmax(classes, dim=1) > 0.1
+        classes = F.softmax(classes, dim=1) > 1/self.caps_num
         classes = classes.float()
         rec_img = torch.zeros(x.size(0),self.input_height*self.input_width *3)
         if USE_CUDA:
             rec_img = rec_img.cuda()
-        for label in range(10):
-            masked_cap =torch.zeros((x.size(0),10))
+        for label in range(self.caps_num):
+            masked_cap =torch.zeros((x.size(0),self.caps_num))
             masked_cap[:,label]=1
             if USE_CUDA:
                  masked_cap = masked_cap.cuda()
@@ -154,7 +155,7 @@ class CapsNet(nn.Module):
                                                 config.pc_kernel_size, config.pc_num_routes)
             self.digit_capsules = DigitCaps(config.dc_num_capsules, config.dc_num_routes, config.dc_in_channels,
                                             config.dc_out_channels, iter_n=iter_n)
-            self.decoder = Decoder(config.input_width, config.input_height, config.cnn_in_channels, multi=multi)
+            self.decoder = Decoder(config.input_width, config.input_height, config.cnn_in_channels, config.dc_num_capsules, config.decoder_layes,multi=multi)
         else:
             self.conv_layer = ConvLayer()
             self.primary_capsules = PrimaryCaps()

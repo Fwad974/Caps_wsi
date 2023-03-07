@@ -66,6 +66,7 @@ class Config:
             self.dc_out_channels = 16
 
             # Decoder
+            self.decoder_layes=(10,16,512,1024)
             self.input_width = 32
             self.input_height = 32
 

@@ -10,7 +10,7 @@ from tqdm import tqdm
 import random
 
 USE_CUDA = True if torch.cuda.is_available() else False
-BATCH_SIZE = 1
+BATCH_SIZE = 100
 N_EPOCHS = 30
 LEARNING_RATE = 0.01
 MOMENTUM = 0.9
@@ -23,7 +23,30 @@ Config class to determine the parameters for capsule net
 
 class Config:
     def __init__(self, dataset='mnist'):
-        if dataset == 'mnist':
+        if dataset=="ADP":
+            # CNN (cnn)
+            self.cnn_in_channels = 3
+            self.cnn_out_channels = 256
+            self.cnn_kernel_size = 223
+
+            # Primary Capsule (pc)
+            self.pc_num_capsules = 8
+            self.pc_in_channels = 256
+            self.pc_out_channels = 32
+            self.pc_kernel_size = 36
+            self.pc_num_routes = 32 * 8 * 8
+
+            # Digit Capsule (dc)
+            self.dc_num_capsules = 12
+            self.dc_num_routes = 32 * 8 * 8
+            self.dc_in_channels = 8
+            self.dc_out_channels = 16
+
+            # Decoder
+            self.decoder_layes = (12, 16, 512, 1024)
+            self.input_width = 272
+            self.input_height = 272
+        elif dataset == 'mnist':
             # CNN (cnn)
             self.cnn_in_channels = 1
             self.cnn_out_channels = 256
@@ -46,28 +69,29 @@ class Config:
             self.input_width = 28
             self.input_height = 28
 
-        elif dataset == 'ADP':
+        elif dataset == 'cifar10':
             # CNN (cnn)
             self.cnn_in_channels = 3
             self.cnn_out_channels = 256
             self.cnn_kernel_size = 9
 
             # Primary Capsule (pc)
-            self.pc_num_capsules = 8
+            self.pc_num_capsules = 32
             self.pc_in_channels = 256
             self.pc_out_channels = 32
             self.pc_kernel_size = 9
-            self.pc_num_routes = 32*8*8
+            self.pc_num_routes = 8 * 8 * 8
 
             # Digit Capsule (dc)
             self.dc_num_capsules = 10
-            self.dc_num_routes = 32*8*8
+            self.dc_num_routes = 32 * 8 * 8
             self.dc_in_channels = 8
             self.dc_out_channels = 16
 
             # Decoder
-            self.input_width = 272
-            self.input_height = 272
+            self.decoder_layes=(10,16,512,1024)
+            self.input_width = 32
+            self.input_height = 32
 
         elif dataset == 'smallnorb':
             # CNN (cnn)
@@ -96,7 +120,7 @@ class Config:
 def train(model, optimizer, train_loader, epoch, multi=False):
     capsule_net = model
     capsule_net.train()
-    #n_batch = len(list(enumerate(train_loader)))
+    n_batch = len(list(enumerate(train_loader)))
     total_loss = 0
     for batch_id, (data, target) in enumerate(tqdm(train_loader)):
         b_size = BATCH_SIZE
@@ -125,8 +149,8 @@ def train(model, optimizer, train_loader, epoch, multi=False):
         optimizer.step()
         if multi:
             correct = 0
-            for i in range(50):
-                if (masked[i].data.cpu().numpy() == target[i].data.cpu().numpy()).all():
+            for i in range(len(data)):
+                if (masked[i].data.cpu().squeeze().numpy() == target[i].data.cpu().numpy()).all():
                     correct += 1
         else:
             correct = sum(np.argmax(masked.data.cpu().numpy(), 1) == np.argmax(target.data.cpu().numpy(), 1))
@@ -134,12 +158,12 @@ def train(model, optimizer, train_loader, epoch, multi=False):
         reconstruc_error = torch.abs(torch.sum(torch.sub(reconstructions,data)))
         train_loss = loss.item()
         total_loss += train_loss
-        if batch_id % 100 == 0:
+        if batch_id % 50 == 0:
             tqdm.write("Epoch: [{}/{}], Batch: [{}/{}], train accuracy: {:.6f}, reconstruc error: {:.6f}, loss: {:.6f}".format(
                 epoch,
                 N_EPOCHS,
                 batch_id + 1,
-            #    n_batch,
+                n_batch,
                 correct / float(b_size),
                 reconstruc_error / float(b_size),
                 train_loss / float(b_size)
@@ -154,31 +178,31 @@ def test(capsule_net, test_loader, epoch, multi=False):
     for batch_id, (data, target) in enumerate(test_loader):
         b_size = len(test_loader.dataset)
 
-        target = torch.sparse.torch.eye(10).index_select(dim=0, index=target)
+        #target = torch.sparse.torch.eye(10).index_select(dim=0, index=target)
 
-        if multi:
-            b_size = b_size/2
-            for i in range(50):
-                j = random.randint(50,99)
-                while np.argmax(target[j]) == np.argmax(target[i]):
-                    j = random.randint(50,99)
-                data[i] = torch.add(data[i], data[j])
-                target[i] = torch.add(target[i], target[j])
-            data = data[0:50,:,:,:]
-            target = target[0:50,:]
+       # if multi:
+        #    b_size = b_size/2
+         #   for i in range(50):
+          #      j = random.randint(50,99)
+           #     while np.argmax(target[j]) == np.argmax(target[i]):
+            #        j = random.randint(50,99)
+             #   data[i] = torch.add(data[i], data[j])
+              #  target[i] = torch.add(target[i], target[j])
+   #         data = data[0:50,:,:,:]
+    #        target = target[0:50,:]
 
         data, target = Variable(data), Variable(target)
 
         if USE_CUDA:
             data, target = data.cuda(), target.cuda()
 
-        output, reconstructions, masked = capsule_net(data)
+        output, reconstructions, masked = capsule_net(data.float())
         loss = capsule_net.loss(data, output, target, reconstructions)
 
         test_loss += loss.item()
         if multi:
-            for i in range(50):
-                if (masked[i].data.cpu().numpy() == target[i].data.cpu().numpy()).all():
+            for i in range(len(data)):
+                if (masked[i].data.cpu().squeeze().numpy() == target[i].data.cpu().numpy()).all():
                     correct += 1
         else:
             correct += sum(np.argmax(masked.data.cpu().numpy(), 1) == np.argmax(target.data.cpu().numpy(), 1))
@@ -195,19 +219,16 @@ def test(capsule_net, test_loader, epoch, multi=False):
                                             reconstruc_error / b_size, test_loss / len(test_loader)))
     return correct / b_size, reconstruc_error / b_size
 
-
 if __name__ == '__main__':
     torch.manual_seed(1)
     # dataset = 'cifar10'
     dataset = 'ADP'
     # dataset = 'smallnorb'
     config = Config(dataset)
-    mnist = Dataset(BATCH_SIZE)
-
-    capsule_net = CapsNet(config)
+    mnist = Dataset(dataset, BATCH_SIZE)
+    capsule_net = CapsNet(config,multi=True)
     capsule_net = torch.nn.DataParallel(capsule_net)
     capsule_net = capsule_net.module
-    #capsule_net=capsule_net.cpu()
 
     optimizer = torch.optim.Adam(capsule_net.parameters())
 

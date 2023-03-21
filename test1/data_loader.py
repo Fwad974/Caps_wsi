@@ -11,8 +11,9 @@ class ADP_Dataset(torch.utils.data.Dataset):
     def __init__(self, path="./ADP_V1.0_Release/", transform=None):
         'Initialization'
         df = pd.read_csv(path + "/ADP_EncodedLabels_Release1_Flat.csv")
-
-        self.labels = df[df.columns[1:11]].to_numpy()
+        df=df[[df.columns[0],"E",	"C"	,"H",	"S",	"A",	"M",	"N",	"G",	"T"]]
+        df=df.sample(frac=0.1, replace=True, random_state=0)
+        self.labels = df[df.columns[1:]].to_numpy()
 
         self.paths = np.array([os.path.join(path, "img_res_1um_bicubic", i) for i in df['Patch Names']])
         self.transform = transforms.Compose([
@@ -47,8 +48,10 @@ class Dataset:
         if dataset=="ADP":
             from torch.utils.data import DataLoader
             data = ADP_Dataset()
+            train_size=int(len(data)*0.8)
+            val_size=len(data)-train_size
 
-            self.train_dataset, self.test_dataset = torch.utils.data.random_split(data, [15901,1767])
+            self.train_dataset, self.test_dataset = torch.utils.data.random_split(data, [train_size,val_size])
             self.train_loader= DataLoader(self.train_dataset, batch_size=_batch_size, shuffle=True)
             self.test_loader= DataLoader(self.test_dataset , batch_size=_batch_size, shuffle=True)
         if dataset == 'mnist':

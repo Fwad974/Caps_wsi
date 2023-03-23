@@ -93,7 +93,11 @@ class Decoder(nn.Module):
             nn.ReLU(inplace=True),
             nn.Linear(decoder_layes[2], decoder_layes[3]),
             nn.ReLU(inplace=True),
-            nn.Linear(decoder_layes[3], self.input_height * self.input_height * self.input_channel),
+            nn.Linear(decoder_layes[3], decoder_layes[4]),
+            nn.ReLU(inplace=True),
+            nn.Linear(decoder_layes[4], decoder_layes[5]),
+            nn.ReLU(inplace=True),
+            nn.Linear(decoder_layes[5], self.input_height * self.input_height * self.input_channel),
             nn.Sigmoid()
         )
         self.caps_num=caps_num
@@ -114,12 +118,13 @@ class Decoder(nn.Module):
             if USE_CUDA:
                  masked_cap = masked_cap.cuda()
             t0 = (x * masked_cap[:, :, None, None]).view(x.size(0), -1)
-       #     rec = self.reconstruction_layers(t0)
-        #    rec = rec* classes[:,label]
-         #   rec_img = torch.add(rec, rec_img)
-        #reconstructions = rec_img.view(-1, self.input_channel, self.input_width, self.input_height)
-        #return reconstructions, classes
-        return  classes
+            rec = self.reconstruction_layers(t0)
+            rec = rec* classes[:,label]
+            rec_img = torch.add(rec, rec_img)
+        reconstructions = rec_img.view(-1, self.input_channel, self.input_width, self.input_height)
+        return reconstructions, classes
+        # return  reconstructions,classes
+
         # classes = torch.sqrt((x ** 2).sum(2))
         # classes = F.softmax(classes, dim=0)
         #
@@ -180,11 +185,11 @@ class CapsNet(nn.Module):
 
     def forward(self, data):
         output, self.routing_in, self.routing_out = self.digit_capsules(self.primary_capsules(self.conv_layer(data)))
-        masked = self.decoder(output, data)
-        return output, masked
+        reconstructions,masked = self.decoder(output, data)
+        return output,reconstructions, masked
 
-    def loss(self, data, x, target):
-        return self.margin_loss(x, target)# + self.reconstruction_loss(data, reconstructions)
+    def loss(self, data, x, target, reconstructions):
+        return self.margin_loss(x, target) + self.reconstruction_loss(data, reconstructions)
 
     def margin_loss(self, x, labels, size_average=True):
         batch_size = x.size(0)

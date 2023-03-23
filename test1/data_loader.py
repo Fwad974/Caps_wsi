@@ -11,7 +11,7 @@ class ADP_Dataset(torch.utils.data.Dataset):
     def __init__(self, path="./ADP_V1.0_Release/", transform=None):
         'Initialization'
         df = pd.read_csv(path + "/ADP_EncodedLabels_Release1_Flat.csv")
-        df=df[[df.columns[0],"E",	"C"	,"H",	"S",	"A",	"M",	"N",	"G",	"T"]] #level 1
+        df=df[[df.columns[0],"E",	"C"	,"H",	"S",	"A",	"M",	"N"]] #level 1
 #         df=df[[df.columns[0],"E.M.S","E.M.C","E.T.S","E.T.C","E.T.X","C.D.I","C.D.R","C.L","C.X","H.E","H.K","H.Y","H.X","S.M","S.C","S.R","A.W","A.M","M","N.P","N.R","N.G.M","N.G.X"]] #level (3)
         df=df.sample(frac=0.1, replace=True, random_state=0)
         self.labels = df[df.columns[1:]].to_numpy()

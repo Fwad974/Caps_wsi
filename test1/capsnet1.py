@@ -205,4 +205,4 @@ class CapsNet(nn.Module):
     def reconstruction_loss(self, data, reconstructions):
         data=torchvision.transforms.functional.rgb_to_grayscale(data)
         loss = self.mse_loss(reconstructions.view(reconstructions.size(0), -1), data.view(reconstructions.size(0), -1))
-        return loss * 0.001
+        return loss * (0.0005/256.0)

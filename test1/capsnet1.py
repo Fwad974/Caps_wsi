@@ -94,12 +94,8 @@ class Decoder(nn.Module):
             nn.ReLU(inplace=True),
             nn.Linear(decoder_layes[2], decoder_layes[3]),
             nn.ReLU(inplace=True),
-            nn.Linear(decoder_layes[3], decoder_layes[4]),
-            nn.ReLU(inplace=True),
-            nn.Linear(decoder_layes[4], decoder_layes[5]),
-            nn.ReLU(inplace=True),
-            nn.Linear(decoder_layes[5], self.input_height * self.input_height * 1),#self.input_channel),
-            nn.Sigmoid()
+            nn.Linear(decoder_layes[3], self.input_height * self.input_height * 1),#self.input_channel),
+            nn.GELU()
         )
         self.caps_num=caps_num
         self.multi = multi
@@ -209,4 +205,4 @@ class CapsNet(nn.Module):
     def reconstruction_loss(self, data, reconstructions):
         data=torchvision.transforms.functional.rgb_to_grayscale(data)
         loss = self.mse_loss(reconstructions.view(reconstructions.size(0), -1), data.view(reconstructions.size(0), -1))
-        return loss * 0.0005
+        return loss * 0.001

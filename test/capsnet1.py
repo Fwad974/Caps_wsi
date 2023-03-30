@@ -6,7 +6,11 @@ import numpy as np
 import torch.nn as nn
 import os
 from torchvision.models.vgg import vgg19
+import torchvision
 USE_CUDA = True if torch.cuda.is_available() else False
+
+import torchvision.transforms as T
+transform = T.Resize(50)
 
 
 class ConvLayer(nn.Module):
@@ -93,19 +97,19 @@ class Decoder(nn.Module):
             nn.ReLU(inplace=True),
             nn.Linear(decoder_layes[2], decoder_layes[3]),
             nn.ReLU(inplace=True),
-            nn.Linear(decoder_layes[3], self.input_height * self.input_height * self.input_channel),
+            nn.Linear(decoder_layes[3], 50 * 50 * 1),#self.input_channel),
             nn.Sigmoid()
         )
         self.caps_num=caps_num
         self.multi = multi
 
-    def forward(self, x, data):
+    def forward(self, x, data,target):
 
         classes = torch.sqrt((x ** 2).sum(2))
         classes1=classes
         classes = F.softmax(classes, dim=1) > 1/self.caps_num
         classes = classes.float()
-        rec_img = torch.zeros(x.size(0),self.input_height*self.input_width *3)
+        rec_img = torch.zeros(x.size(0),50*50 *1)
         if USE_CUDA:
             rec_img = rec_img.cuda()
         for label in range(self.caps_num):
@@ -115,10 +119,15 @@ class Decoder(nn.Module):
                  masked_cap = masked_cap.cuda()
             t0 = (x * masked_cap[:, :, None, None]).view(x.size(0), -1)
             rec = self.reconstruction_layers(t0)
-            rec = rec* classes[:,label]
+            # print(target[:,label])
+            # print(classes[:,label, None])
+            rec = rec* target[:,label, None]
+
             rec_img = torch.add(rec, rec_img)
-        reconstructions = rec_img.view(-1, self.input_channel, self.input_width, self.input_height)
+        reconstructions = rec_img.view(-1, 1, 50, 50)
         return reconstructions, classes
+        # return  reconstructions,classes
+
         # classes = torch.sqrt((x ** 2).sum(2))
         # classes = F.softmax(classes, dim=0)
         #
@@ -159,7 +168,7 @@ class CapsNet(nn.Module):
             else:
                 model = torch.hub.load('pytorch/vision:v0.10.0', 'vgg19', pretrained=True)
             for param in model.parameters():
-                param.requires_grad = False
+                param.requires_grad = True#False
             layers = list(model.features.children())[:11]
             # layers[0] = nn.Conv2d(1, 64, kernel_size=3, stride=1, padding=1)
             features = nn.Sequential(*layers)
@@ -177,13 +186,14 @@ class CapsNet(nn.Module):
 
         self.mse_loss = nn.MSELoss()
 
-    def forward(self, data):
+    def forward(self, data,target):
         output, self.routing_in, self.routing_out = self.digit_capsules(self.primary_capsules(self.conv_layer(data)))
-        reconstructions, masked = self.decoder(output, data)
-        return output, reconstructions, masked
+        reconstructions,masked = self.decoder(output, data,target)
+        return output,reconstructions, masked
 
     def loss(self, data, x, target, reconstructions):
         return self.margin_loss(x, target) + self.reconstruction_loss(data, reconstructions)
+       # return  self.reconstruction_loss(data, reconstructions)
 
     def margin_loss(self, x, labels, size_average=True):
         batch_size = x.size(0)
@@ -199,5 +209,7 @@ class CapsNet(nn.Module):
         return loss
 
     def reconstruction_loss(self, data, reconstructions):
+        data=torchvision.transforms.functional.rgb_to_grayscale(data)
+        data = transform(data)
         loss = self.mse_loss(reconstructions.view(reconstructions.size(0), -1), data.view(reconstructions.size(0), -1))
-        return loss * 0.0005
+        return loss * (0.0005)

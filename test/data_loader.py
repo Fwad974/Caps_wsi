@@ -53,8 +53,8 @@ class Dataset:
             val_size=len(data)-train_size
 
             self.train_dataset, self.test_dataset = torch.utils.data.random_split(data, [train_size,val_size])
-            self.train_loader= DataLoader(self.train_dataset, batch_size=_batch_size, shuffle=True)
-            self.test_loader= DataLoader(self.test_dataset , batch_size=_batch_size, shuffle=True)
+            self.train_loader= DataLoader(self.train_dataset, batch_size=_batch_size, shuffle=False)
+            self.test_loader= DataLoader(self.test_dataset , batch_size=_batch_size, shuffle=False)
         if dataset == 'mnist':
                 dataset_transform = transforms.Compose([
                     transforms.ToTensor(),
